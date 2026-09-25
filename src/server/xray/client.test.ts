@@ -1,7 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createXrayTestsInTestSet, XrayApiError } from './client';
+import { createXrayTestsInTestSet, encodeBasicAuth, XrayApiError } from './client';
 
 describe('createXrayTestsInTestSet', () => {
+  it('encodes Jira fallback credentials with the Web platform Base64 API', () => {
+    expect(encodeBasicAuth('tester@example.com', 'jira-token')).toBe('dGVzdGVyQGV4YW1wbGUuY29tOmppcmEtdG9rZW4=');
+  });
+
   it('authenticates, creates cucumber tests, and attaches them to a test set', async () => {
     const fetcher = vi
       .fn()
@@ -245,7 +249,7 @@ describe('createXrayTestsInTestSet', () => {
 
     const jiraRequest = fetcher.mock.calls[2][1];
     expect(jiraRequest?.headers).toEqual({
-      Authorization: `Basic ${Buffer.from('tester@example.com:jira-token').toString('base64')}`,
+      Authorization: 'Basic dGVzdGVyQGV4YW1wbGUuY29tOmppcmEtdG9rZW4=',
       Accept: 'application/json'
     });
 

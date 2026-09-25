@@ -1,0 +1,10 @@
+# Copy to .dev.vars for `npm run dev`. This file is intentionally gitignored.
+MIRO_ACCESS_TOKEN=replace-with-miro-token
+XRAY_CLIENT_ID=replace-with-xray-client-id
+XRAY_CLIENT_SECRET=replace-with-xray-client-secret
+XRAY_BASE_URL=https://xray.cloud.getxray.app
+JIRA_BASE_URL=https://your-company.atlassian.net
+# Optional: only used when Xray cannot resolve a Test Set issue ID.
+JIRA_EMAIL=replace-with-atlassian-bot-email
+JIRA_API_TOKEN=replace-with-jira-api-token
+GEMINI_API_KEY=replace-with-gemini-api-key

@@ -4,15 +4,14 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "concurrently -k -n server,client -c blue,green \"tsx watch src/server/index.ts\" \"vite --host 127.0.0.1\"",
-    "build": "tsc --noEmit && vite build",
+    "dev": "wrangler dev",
+    "build": "vite build",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "deploy": "wrangler deploy"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
-    "dotenv": "latest",
-    "express": "latest",
     "react": "latest",
     "react-dom": "latest"
   },
@@ -20,17 +19,13 @@
     "@testing-library/jest-dom": "latest",
     "@testing-library/react": "latest",
     "@testing-library/user-event": "latest",
-    "@types/express": "latest",
     "@types/node": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
-    "@types/supertest": "latest",
-    "concurrently": "latest",
     "jsdom": "latest",
-    "supertest": "latest",
-    "tsx": "latest",
     "typescript": "latest",
     "vite": "latest",
-    "vitest": "latest"
+    "vitest": "latest",
+    "wrangler": "latest"
   }
 }

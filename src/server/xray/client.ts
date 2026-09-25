@@ -52,6 +52,15 @@ async function readJsonResponse(response: Response): Promise<unknown> {
   return text ? JSON.parse(text) : null;
 }
 
+export function encodeBasicAuth(username: string, password: string): string {
+  const bytes = new TextEncoder().encode(`${username}:${password}`);
+  let binary = '';
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+  return btoa(binary);
+}
+
 async function authenticate(
   config: XrayConfig,
   fetcher: typeof fetch,
@@ -181,9 +190,7 @@ async function resolveJiraIssue(
     {
       method: "GET",
       headers: {
-        Authorization: `Basic ${Buffer.from(
-          `${config.jiraEmail}:${config.jiraApiToken}`,
-        ).toString("base64")}`,
+        Authorization: `Basic ${encodeBasicAuth(config.jiraEmail, config.jiraApiToken)}`,
         Accept: "application/json",
       },
     },

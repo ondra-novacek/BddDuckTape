@@ -47,14 +47,6 @@ query GetTestSet($jql: String!) {
   }
 }`;
 
-const getTestSetByIssueIdQuery = `
-query GetTestSetByIssueId($issueId: String!) {
-  getTestSet(issueId: $issueId) {
-    issueId
-    jira(fields: ["key"])
-  }
-}`;
-
 async function readJsonResponse(response: Response): Promise<unknown> {
   const text = await response.text();
   return text ? JSON.parse(text) : null;
@@ -156,50 +148,36 @@ async function resolveTestSetIssueId(
   };
 
   const testSet = body.data?.getTestSets?.results?.[0];
-  console.log("testSet", body);
   if (typeof testSet?.issueId === "string") {
     return testSet.issueId;
   }
 
-  const jiraIssueId = await resolveJiraIssueId(config, testSetKey, fetcher);
-  if (!jiraIssueId) {
+  const jiraIssue = await resolveJiraIssue(config, testSetKey, fetcher);
+  if (!jiraIssue) {
     throw new XrayApiError(`Xray Test Set ${testSetKey} was not found.`, 404);
   }
 
-  const byIssueIdBody = (await graphql(
-    config,
-    token,
-    getTestSetByIssueIdQuery,
-    { issueId: jiraIssueId },
-    fetcher,
-  )) as {
-    data?: {
-      getTestSet?: { issueId?: unknown; jira?: { key?: unknown } } | null;
-    };
-  };
-
-  const testSetByIssueId = byIssueIdBody.data?.getTestSet;
-  if (typeof testSetByIssueId?.issueId !== "string") {
+  if (jiraIssue.issueTypeName !== "Test Set") {
     throw new XrayApiError(
-      `Jira issue ${testSetKey} exists as ${jiraIssueId}, but Xray did not return it as a Test Set.`,
+      `Jira issue ${testSetKey} exists as ${jiraIssue.id}, but is not an Xray Test Set.`,
       404,
     );
   }
 
-  return testSetByIssueId.issueId;
+  return jiraIssue.id;
 }
 
-async function resolveJiraIssueId(
+async function resolveJiraIssue(
   config: XrayConfig,
   testSetKey: string,
   fetcher: typeof fetch,
-): Promise<string | null> {
+): Promise<{ id: string; issueTypeName: string | null } | null> {
   if (!config.jiraBaseUrl || !config.jiraEmail || !config.jiraApiToken) {
     return null;
   }
 
   const response = await fetcher(
-    `${config.jiraBaseUrl.replace(/\/$/, "")}/rest/api/3/issue/${testSetKey}`,
+    `${config.jiraBaseUrl.replace(/\/$/, "")}/rest/api/3/issue/${testSetKey}?fields=issuetype`,
     {
       method: "GET",
       headers: {
@@ -210,14 +188,22 @@ async function resolveJiraIssueId(
       },
     },
   );
-  const body = (await readJsonResponse(response)) as { id?: unknown } | null;
-  console.log("body", body);
+  const body = (await readJsonResponse(response)) as {
+    id?: unknown;
+    fields?: { issuetype?: { name?: unknown } };
+  } | null;
 
   if (!response.ok || typeof body?.id !== "string") {
     return null;
   }
 
-  return body.id;
+  return {
+    id: body.id,
+    issueTypeName:
+      typeof body.fields?.issuetype?.name === "string"
+        ? body.fields.issuetype.name
+        : null,
+  };
 }
 
 export async function createXrayTestsInTestSet(

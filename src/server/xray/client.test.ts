@@ -189,11 +189,8 @@ describe('createXrayTestsInTestSet', () => {
         new Response(JSON.stringify({ data: { getTestSets: { results: [] } } }), { status: 200 })
       )
       .mockResolvedValueOnce(
-        new Response(JSON.stringify({ id: '77164', key: 'LW1-30482' }), { status: 200 })
-      )
-      .mockResolvedValueOnce(
         new Response(
-          JSON.stringify({ data: { getTestSet: { issueId: '77164', jira: { key: 'LW1-30482' } } } }),
+          JSON.stringify({ id: '77164', fields: { issuetype: { name: 'Test Set' } } }),
           { status: 200 }
         )
       )
@@ -243,7 +240,7 @@ describe('createXrayTestsInTestSet', () => {
 
     expect(result.created).toEqual([{ sourceId: 'note-1', issueId: '10001', key: 'LW1-1' }]);
     expect(String(fetcher.mock.calls[2][0])).toBe(
-      'https://levelworks.atlassian.net/rest/api/3/issue/LW1-30482'
+      'https://levelworks.atlassian.net/rest/api/3/issue/LW1-30482?fields=issuetype'
     );
 
     const jiraRequest = fetcher.mock.calls[2][1];
@@ -252,13 +249,129 @@ describe('createXrayTestsInTestSet', () => {
       Accept: 'application/json'
     });
 
-    const xrayVerifyRequest = JSON.parse(String(fetcher.mock.calls[3][1]?.body));
-    expect(xrayVerifyRequest.variables).toEqual({ issueId: '77164' });
-
-    const attachRequest = JSON.parse(String(fetcher.mock.calls[5][1]?.body));
+    const attachRequest = JSON.parse(String(fetcher.mock.calls[4][1]?.body));
     expect(attachRequest.variables).toEqual({
       issueId: '77164',
       testIssueIds: ['10001']
     });
+  });
+
+  it('attaches Tests to a Jira-visible Test Set when Xray cannot read it', async () => {
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify('token-123'), { status: 200 }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ data: { getTestSets: { results: [] } } }), { status: 200 })
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            id: '77164',
+            fields: { issuetype: { name: 'Test Set' } }
+          }),
+          { status: 200 }
+        )
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            data: {
+              createTest: {
+                test: { issueId: '10001', jira: { key: 'LW1-1' } },
+                warnings: []
+              }
+            }
+          }),
+          { status: 200 }
+        )
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            data: { addTestsToTestSet: { addedTests: ['10001'], warning: null } }
+          }),
+          { status: 200 }
+        )
+      );
+
+    await expect(
+      createXrayTestsInTestSet(
+        {
+          clientId: 'client-id',
+          clientSecret: 'client-secret',
+          baseUrl: 'https://xray.example',
+          jiraBaseUrl: 'https://levelworks.atlassian.net',
+          jiraEmail: 'tester@example.com',
+          jiraApiToken: 'jira-token'
+        },
+        {
+          testSetKey: 'LW1-30482',
+          scenarios: [
+            {
+              sourceId: 'note-1',
+              summary: 'Successful login',
+              gherkin: 'Scenario: user logs in'
+            }
+          ]
+        },
+        fetcher as unknown as typeof fetch
+      )
+    ).resolves.toEqual({
+      created: [{ sourceId: 'note-1', issueId: '10001', key: 'LW1-1' }],
+      warnings: []
+    });
+
+    expect(fetcher).toHaveBeenCalledTimes(5);
+    const attachRequest = JSON.parse(String(fetcher.mock.calls[4][1]?.body));
+    expect(attachRequest.variables).toEqual({
+      issueId: '77164',
+      testIssueIds: ['10001']
+    });
+  });
+
+  it('rejects a Jira issue that is not a Test Set before creating Tests', async () => {
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify('token-123'), { status: 200 }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ data: { getTestSets: { results: [] } } }), { status: 200 })
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            id: '77164',
+            fields: { issuetype: { name: 'Story' } }
+          }),
+          { status: 200 }
+        )
+      );
+
+    await expect(
+      createXrayTestsInTestSet(
+        {
+          clientId: 'client-id',
+          clientSecret: 'client-secret',
+          baseUrl: 'https://xray.example',
+          jiraBaseUrl: 'https://levelworks.atlassian.net',
+          jiraEmail: 'tester@example.com',
+          jiraApiToken: 'jira-token'
+        },
+        {
+          testSetKey: 'LW1-30482',
+          scenarios: [
+            {
+              sourceId: 'note-1',
+              summary: 'Successful login',
+              gherkin: 'Scenario: user logs in'
+            }
+          ]
+        },
+        fetcher as unknown as typeof fetch
+      )
+    ).rejects.toMatchObject({
+      message: 'Jira issue LW1-30482 exists as 77164, but is not an Xray Test Set.'
+    } satisfies Partial<XrayApiError>);
+
+    expect(fetcher).toHaveBeenCalledTimes(3);
   });
 });
